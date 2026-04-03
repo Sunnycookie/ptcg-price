@@ -516,7 +516,7 @@
       <h1>查询 <em>PTCG</em><br>卡片价格</h1>
       <p>数据来源 pokemontcg.io · 包含 TCGPlayer & Cardmarket 价格 · 支持中文/日文/韩文名称搜索</p>
       <div class="search-bar">
-        <input id="search-input" type="text" placeholder="输入宝可梦名称，支持中文/日文/英文，如 喷火龙 / リザードン / charizard" autocomplete="off">
+        <input id="search-input" type="text" placeholder="支持中文/日文/英文/图鉴号，如 喷火龙 · リザードン · charizard · #006" autocomplete="off">
         <select class="lang-select" id="page-size-select">
           <option value="10">10条</option>
           <option value="20">20条</option>
@@ -569,6 +569,7 @@ let _sortCol = null, _sortDir = 1;
 let _lastSearchData = [];
 let _nameMap = {};     // 中/日/韩 → 英文
 let _enNames = [];     // 英文名列表（用于自动补全）
+let _dexMap  = {};     // #006 / 6 → 英文名
 
 // ── 加载名称对照表 ──
 async function loadNameMap() {
@@ -578,18 +579,23 @@ async function loadNameMap() {
     const data = await r.json();
     _nameMap = data.name_map || {};
     _enNames = data.en_names || [];
+    _dexMap  = data.dex_map  || {};
     setupAutocomplete();
   } catch(e) {
     console.warn('names.json 加载失败，仅支持英文搜索', e);
   }
 }
 
-// ── 名称转换：中/日/韩 → 英文 ──
+// ── 名称转换：中/日/韩/图鉴号 → 英文 ──
 function toEnglishName(input) {
   const trimmed = input.trim();
+  // 图鉴号格式：#006 / #25 / 纯数字
+  if (/^#?\d+$/.test(trimmed)) {
+    return _dexMap[trimmed] || _dexMap[trimmed.replace('#','')] || trimmed;
+  }
   // 已经是英文（全ASCII），直接用
   if (/^[\x00-\x7F]+$/.test(trimmed)) return trimmed;
-  // 查对照表
+  // 查中/日/韩对照表
   return _nameMap[trimmed] || trimmed;
 }
 
@@ -697,6 +703,7 @@ function renderSearchTable(cards, total, q) {
       <thead><tr>
         <th onclick="sortTable(0)">卡片ID</th>
         <th onclick="sortTable(1)">卡名</th>
+        <th onclick="sortTable(6)">图鉴号</th>
         <th onclick="sortTable(2)">系列</th>
         <th onclick="sortTable(3)">稀有度</th>
         <th onclick="sortTable(4)">市场价 (USD)</th>
@@ -748,9 +755,12 @@ function renderSearchRow(card) {
   const mStr = market !== null ? `$${market.toFixed(2)}` : '—';
   const lStr = low !== null ? `$${low.toFixed(2)}` : '—';
   const mClass = market !== null ? (market >= 50 ? 'price-cell high' : 'price-cell') : 'price-cell none';
+  const dexNums = card.nationalPokedexNumbers;
+  const dexStr = dexNums && dexNums.length ? dexNums.map(n => `#${String(n).padStart(3,'0')}`).join(' ') : '—';
   return `<tr>
     <td><span class="card-id">${card.id}</span></td>
     <td><span class="card-name">${card.name}</span></td>
+    <td><span class="card-id">${dexStr}</span></td>
     <td><span class="card-set">${card.set?.name || '—'}</span></td>
     <td><span class="rarity-badge ${rarityClass(card.rarity)}">${card.rarity || '—'}</span></td>
     <td class="${mClass}">${mStr}</td>
@@ -776,6 +786,7 @@ function sortTable(col) {
     else if (col === 3) { va = a.rarity || ''; vb = b.rarity || ''; }
     else if (col === 4) { va = getBestPrice(a).market || -1; vb = getBestPrice(b).market || -1; return (va - vb) * _sortDir; }
     else if (col === 5) { va = getBestPrice(a).low || -1; vb = getBestPrice(b).low || -1; return (va - vb) * _sortDir; }
+    else if (col === 6) { va = (a.nationalPokedexNumbers||[0])[0]||9999; vb = (b.nationalPokedexNumbers||[0])[0]||9999; return (va-vb)*_sortDir; }
     return va < vb ? -_sortDir : va > vb ? _sortDir : 0;
   });
   document.querySelector('#search-table tbody').innerHTML = sorted.map(c => renderSearchRow(c)).join('');
@@ -896,7 +907,8 @@ function renderDetail(card) {
         <div class="detail-meta">
           <span class="meta-chip">${card.id}</span>
           <span class="meta-chip">${set.series || ''} · ${set.name || ''}</span>
-          <span class="meta-chip">#${card.number || '?'}</span>
+          <span class="meta-chip">印刷编号 #${card.number || '?'}</span>
+          ${card.nationalPokedexNumbers?.length ? `<span class="meta-chip">图鉴 ${card.nationalPokedexNumbers.map(n=>'#'+String(n).padStart(3,'0')).join(' ')}</span>` : ''}
           ${card.rarity ? `<span class="meta-chip rarity-badge ${rarityClass(card.rarity)}">${card.rarity}</span>` : ''}
           ${card.artist ? `<span class="meta-chip">画师：${card.artist}</span>` : ''}
           ${set.releaseDate ? `<span class="meta-chip">${set.releaseDate}</span>` : ''}
