@@ -827,6 +827,31 @@ async function fetchYYT(jpName, exactName = '') {
   }
 }
 
+function renderDetailJP(results, jaName, label = '') {
+  return `
+    <div class="price-section" style="margin-top:0;">
+      <h3 style="display:flex;align-items:center;gap:8px;">
+        <span class="jp-badge">🇯🇵 日版</span> 遊々亭价格
+        ${label === '相似推荐' ? '<span style="font-size:12px;color:var(--text2);font-weight:400;">· 相似推荐</span>' : ''}
+      </h3>
+      <div class="jp-grid" style="margin-top:12px;">
+        ${results.slice(0,6).map(c => `
+          <div class="jp-card">
+            <a href="${c.url}" target="_blank" rel="noopener">
+              <div class="jp-card-name">${c.name}</div>
+              ${c.number ? `<div class="jp-card-number">${c.number}</div>` : ''}
+              <div class="jp-card-price">¥${c.price_jpy.toLocaleString()}</div>
+              <div class="jp-card-stock ${c.stock==='售罄'?'sold':''}">${c.stock}</div>
+            </a>
+          </div>`).join('')}
+      </div>
+      <a href="https://yuyu-tei.jp/sell/poc/s/search?search_word=${encodeURIComponent(jaName)}"
+         target="_blank" class="buy-link" style="margin-top:16px;">
+        在遊々亭查看全部 ${results.length} 条结果 ↗
+      </a>
+    </div>`;
+}
+
 // 中文名 → 日文名映射
 const ZH_TO_JA = {
   '喷火龙': 'リザードン', '小火龙': 'ヒトカゲ', '火恐龙': 'リザード',
@@ -1104,38 +1129,34 @@ async function loadDetail(cardId, from) {
     // exact 只在能转换出日文名时启用（避免传入英文导致零结果）
     const exactJa = jaName !== card.name ? jaName : '';
     console.log('详情页日版 search:', searchJa, 'exact:', exactJa);
-    fetchYYT(searchJa, exactJa).then(({ results: yytResults, error }) => {
+    // 第一步：精确匹配
+    fetchYYT(searchJa, exactJa).then(async ({ results: exactResults, error }) => {
       const el = document.getElementById('detail-jp-price');
       if (!el) return;
       if (error) {
         el.innerHTML = '<p style="color:#e53935;font-size:13px;">⚠️ 日版价格连接错误，请刷新重试</p>';
         return;
       }
-      if (!yytResults.length) {
-        el.innerHTML = '<p style="color:var(--text2);font-size:13px;">🇯🇵 未查找到日版价格</p>';
+
+      // 精确匹配有结果
+      if (exactResults.length > 0) {
+        el.innerHTML = renderDetailJP(exactResults, searchJa, '精确匹配');
         return;
       }
-      el.innerHTML = `
-        <div class="price-section" style="margin-top:0;">
-          <h3 style="display:flex;align-items:center;gap:8px;">
-            <span class="jp-badge">🇯🇵 日版</span> 遊々亭价格
-          </h3>
-          <div class="jp-grid" style="margin-top:12px;">
-            ${yytResults.slice(0,6).map(c => `
-              <div class="jp-card">
-                <a href="${c.url}" target="_blank" rel="noopener">
-                  <div class="jp-card-name">${c.name}</div>
-                  ${c.number ? `<div class="jp-card-number">${c.number}</div>` : ''}
-                  <div class="jp-card-price">¥${c.price_jpy.toLocaleString()}</div>
-                  <div class="jp-card-stock ${c.stock==='售罄'?'sold':''}">${c.stock}</div>
-                </a>
-              </div>`).join('')}
-          </div>
-          <a href="https://yuyu-tei.jp/sell/poc/s/search?search_word=${encodeURIComponent(jaName)}"
-             target="_blank" class="buy-link" style="margin-top:16px;">
-            在遊々亭查看全部 ${yytResults.length} 条结果 ↗
-          </a>
-        </div>`;
+
+      // 精确匹配为空 → 提示并显示相似推荐
+      if (exactJa) {
+        el.innerHTML = `<p style="color:var(--text2);font-size:13px;margin-bottom:8px;">🇯🇵 未找到精确匹配的日版卡牌，为您推荐相似卡牌：</p>`;
+        // 再拉宽泛结果（不带 exact）
+        const { results: similarResults } = await fetchYYT(searchJa);
+        if (similarResults.length > 0) {
+          el.innerHTML += renderDetailJP(similarResults, searchJa, '相似推荐');
+        } else {
+          el.innerHTML += '<p style="color:var(--text2);font-size:13px;">🇯🇵 未查找到日版价格</p>';
+        }
+      } else {
+        el.innerHTML = '<p style="color:var(--text2);font-size:13px;">🇯🇵 未查找到日版价格</p>';
+      }
     });
   } catch(e) {
     document.getElementById('detail-content').innerHTML = `<div class="error-banner">❌ 加载失败：${e.message}</div>`;
