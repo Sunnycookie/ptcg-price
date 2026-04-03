@@ -814,10 +814,12 @@ function quickSearch(name) {
 
 let _yytData = [];  // 日版数据缓存
 
-async function fetchYYT(jpName) {
+async function fetchYYT(jpName, exactName = '') {
   if (!jpName) return { results: [], error: null };
   try {
-    const data = await fetchJSON(`${YYT_API}?name=${encodeURIComponent(jpName)}&limit=30`);
+    let url = `${YYT_API}?name=${encodeURIComponent(jpName)}&limit=50`;
+    if (exactName) url += `&exact=${encodeURIComponent(exactName)}`;
+    const data = await fetchJSON(url);
     return { results: data.results || [], error: null };
   } catch(e) {
     console.warn('遊々亭数据获取失败:', e.message);
@@ -1095,13 +1097,14 @@ async function loadDetail(cardId, from) {
     const card = data.data;
     document.getElementById('detail-content').innerHTML = renderDetail(card);
 
-    // 异步加载日版价格（不阻塞主内容）
-    // 优先用搜索时已有的日版数据（同名卡）
+    // 异步加载日版价格（精确匹配）
     const jaName = toJapaneseName(card.name);
-    // 如果 nameMap 转换失败（返回英文），尝试用搜索词的日文名
-    const searchJa = jaName === card.name ? toJapaneseName(_lastQuery || card.name) : jaName;
-    console.log('详情页日版搜索词:', searchJa, '| 原名:', card.name);
-    fetchYYT(searchJa).then(({ results: yytResults, error }) => {
+    // searchJa：宽泛搜索词（宝可梦名），exactJa：精确过滤（带后缀的完整卡名）
+    const searchJa = jaName !== card.name ? jaName : toJapaneseName(_lastQuery || card.name);
+    // exact 只在能转换出日文名时启用（避免传入英文导致零结果）
+    const exactJa = jaName !== card.name ? jaName : '';
+    console.log('详情页日版 search:', searchJa, 'exact:', exactJa);
+    fetchYYT(searchJa, exactJa).then(({ results: yytResults, error }) => {
       const el = document.getElementById('detail-jp-price');
       if (!el) return;
       if (error) {
