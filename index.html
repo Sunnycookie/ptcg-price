@@ -815,13 +815,13 @@ function quickSearch(name) {
 let _yytData = [];  // 日版数据缓存
 
 async function fetchYYT(jpName) {
-  if (!jpName) return [];
+  if (!jpName) return { results: [], error: null };
   try {
     const data = await fetchJSON(`${YYT_API}?name=${encodeURIComponent(jpName)}&limit=30`);
-    return data.results || [];
+    return { results: data.results || [], error: null };
   } catch(e) {
     console.warn('遊々亭数据获取失败:', e.message);
-    return [];
+    return { results: [], error: e.message };
   }
 }
 
@@ -895,15 +895,28 @@ async function doSearch(page = 1) {
 
   // 异步加载日版，完成后插入
   if (page === 1) {
-    fetchYYT(jaName).then(yytResults => {
-      _yytData = yytResults;
+    fetchYYT(jaName).then(({ results, error }) => {
+      _yytData = results;
       const loadingEl = document.getElementById('yyt-loading');
-      if (loadingEl) {
-        if (yytResults.length > 0) {
-          loadingEl.outerHTML = renderJPSection(yytResults);
-        } else {
-          loadingEl.remove();
-        }
+      if (!loadingEl) return;
+      if (error) {
+        // 连接出错
+        loadingEl.outerHTML = `
+          <div style="margin:16px 0;padding:16px;background:var(--card);border-radius:12px;border:1px solid #f5c6c6;text-align:center;">
+            <span style="font-size:20px;">⚠️</span>
+            <p style="color:#e53935;margin:8px 0 4px;font-weight:600;">日版价格连接错误</p>
+            <p style="color:var(--text2);font-size:13px;">请刷新页面重试</p>
+          </div>`;
+      } else if (results.length > 0) {
+        // 有数据
+        loadingEl.outerHTML = renderJPSection(results);
+      } else {
+        // 无数据
+        loadingEl.outerHTML = `
+          <div style="margin:16px 0;padding:16px;background:var(--card);border-radius:12px;border:1px solid var(--border);text-align:center;">
+            <span style="font-size:20px;">🇯🇵</span>
+            <p style="color:var(--text2);margin:8px 0 0;font-size:14px;">未查找到日版价格</p>
+          </div>`;
       }
     });
   }
@@ -1083,11 +1096,15 @@ async function loadDetail(cardId, from) {
 
     // 异步加载日版价格（不阻塞主内容）
     const jaName = toJapaneseName(card.name);
-    fetchYYT(jaName).then(yytResults => {
+    fetchYYT(jaName).then(({ results: yytResults, error }) => {
       const el = document.getElementById('detail-jp-price');
       if (!el) return;
+      if (error) {
+        el.innerHTML = '<p style="color:#e53935;font-size:13px;">⚠️ 日版价格连接错误，请刷新重试</p>';
+        return;
+      }
       if (!yytResults.length) {
-        el.innerHTML = '<p style="color:var(--text2);font-size:13px;">暂无日版价格数据</p>';
+        el.innerHTML = '<p style="color:var(--text2);font-size:13px;">🇯🇵 未查找到日版价格</p>';
         return;
       }
       el.innerHTML = `
