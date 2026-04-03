@@ -885,40 +885,42 @@ async function doSearch(page = 1) {
   _lastSearchData.sort((a, b) => (getBestPrice(b).market||0) - (getBestPrice(a).market||0));
   _sortCol = 4; _sortDir = -1;
 
-  // 先渲染美版结果（日版区显示加载中）
-  if (page === 1) {
-    el.innerHTML = renderSearchTable(_lastSearchData, _totalCount, q, page, []) +
-      `<div id="yyt-loading" style="padding:16px;color:var(--text2);text-align:center;">⏳ 正在加载日版价格…</div>`;
-  } else {
-    el.innerHTML = renderSearchTable(_lastSearchData, _totalCount, q, page, _yytData);
+  // 渲染美版结果
+  el.innerHTML = renderSearchTable(_lastSearchData, _totalCount, q, page, _yytData);
+
+  // 日版区：始终固定在搜索结果容器下方的独立区域
+  let jpEl = document.getElementById('yyt-section');
+  if (!jpEl) {
+    jpEl = document.createElement('div');
+    jpEl.id = 'yyt-section';
+    el.parentNode.insertBefore(jpEl, el.nextSibling);
   }
 
-  // 异步加载日版，完成后插入
+  // 翻页时用缓存数据，第一页重新请求
   if (page === 1) {
+    jpEl.innerHTML = `<div id="yyt-loading" style="padding:16px;color:var(--text2);text-align:center;">⏳ 正在加载日版价格…</div>`;
     fetchYYT(jaName).then(({ results, error }) => {
       _yytData = results;
-      const loadingEl = document.getElementById('yyt-loading');
-      if (!loadingEl) return;
       if (error) {
-        // 连接出错
-        loadingEl.outerHTML = `
+        jpEl.innerHTML = `
           <div style="margin:16px 0;padding:16px;background:var(--card);border-radius:12px;border:1px solid #f5c6c6;text-align:center;">
             <span style="font-size:20px;">⚠️</span>
             <p style="color:#e53935;margin:8px 0 4px;font-weight:600;">日版价格连接错误</p>
             <p style="color:var(--text2);font-size:13px;">请刷新页面重试</p>
           </div>`;
       } else if (results.length > 0) {
-        // 有数据
-        loadingEl.outerHTML = renderJPSection(results);
+        jpEl.innerHTML = renderJPSection(results);
       } else {
-        // 无数据
-        loadingEl.outerHTML = `
+        jpEl.innerHTML = `
           <div style="margin:16px 0;padding:16px;background:var(--card);border-radius:12px;border:1px solid var(--border);text-align:center;">
             <span style="font-size:20px;">🇯🇵</span>
             <p style="color:var(--text2);margin:8px 0 0;font-size:14px;">未查找到日版价格</p>
           </div>`;
       }
     });
+  } else {
+    // 翻页时用缓存
+    jpEl.innerHTML = _yytData.length > 0 ? renderJPSection(_yytData) : '';
   }
 }
 
@@ -973,8 +975,7 @@ function renderSearchTable(cards, total, q, page = 1, yytData = []) {
       </tbody>
     </table>
     </div>
-    ${renderPagination(page, totalPages)}
-    ${page === 1 ? renderJPSection(yytData) : ''}`;
+    ${renderPagination(page, totalPages)}`;
 }
 
 function renderPagination(current, total) {
@@ -1095,8 +1096,12 @@ async function loadDetail(cardId, from) {
     document.getElementById('detail-content').innerHTML = renderDetail(card);
 
     // 异步加载日版价格（不阻塞主内容）
+    // 优先用搜索时已有的日版数据（同名卡）
     const jaName = toJapaneseName(card.name);
-    fetchYYT(jaName).then(({ results: yytResults, error }) => {
+    // 如果 nameMap 转换失败（返回英文），尝试用搜索词的日文名
+    const searchJa = jaName === card.name ? toJapaneseName(_lastQuery || card.name) : jaName;
+    console.log('详情页日版搜索词:', searchJa, '| 原名:', card.name);
+    fetchYYT(searchJa).then(({ results: yytResults, error }) => {
       const el = document.getElementById('detail-jp-price');
       if (!el) return;
       if (error) {
