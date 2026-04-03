@@ -93,6 +93,74 @@
   #panel-search { padding-top: 0; }
   .search-results-body { padding-top: 28px; }
 
+  /* ── Japan Price Section ── */
+  .jp-section {
+    margin-top: 36px;
+    padding-top: 24px;
+    border-top: 2px solid var(--text);
+  }
+  .jp-section h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .jp-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    background: #dc2626;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 2px;
+    letter-spacing: 0.05em;
+  }
+  .jp-sub {
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 16px;
+  }
+  .jp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+  }
+  .jp-card {
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    background: var(--card-bg);
+    transition: border-color 150ms;
+  }
+  .jp-card:hover { border-color: var(--text); }
+  .jp-card a { text-decoration: none; color: inherit; }
+  .jp-card-name {
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+  .jp-card-number {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text2);
+    margin-bottom: 6px;
+  }
+  .jp-card-price {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 16px;
+    color: #dc2626;
+  }
+  .jp-card-stock {
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+  .jp-card-stock.sold { color: #aaa; }
+
   /* ── Pagination ── */
   .pagination {
     display: flex;
@@ -626,6 +694,7 @@
 
 <script>
 const API = 'https://api.pokemontcg.io/v2';
+const YYT_API = 'https://ptcg-price.vercel.app/api/yuyutei';
 let _prevPanel = 'search';
 let _sortCol = 4, _sortDir = -1;   // 默认按市场价降序
 let _lastSearchData = [];
@@ -740,35 +809,82 @@ function quickSearch(name) {
   doSearch();
 }
 
+let _yytData = [];  // 日版数据缓存
+
+async function fetchYYT(jpName) {
+  if (!jpName) return [];
+  try {
+    const data = await fetchJSON(`${YYT_API}?name=${encodeURIComponent(jpName)}&limit=30`);
+    return data.results || [];
+  } catch(e) {
+    console.warn('遊々亭数据获取失败:', e.message);
+    return [];
+  }
+}
+
+// 英文名 → 日文名映射（用于遊々亭搜索）
+function toJapaneseName(enName) {
+  // 从 nameMap 反查
+  const lower = enName.toLowerCase();
+  for (const [ja, en] of Object.entries(_nameMap)) {
+    if (en.toLowerCase() === lower && /[\u3000-\u9fff]/.test(ja)) return ja;
+  }
+  return enName;
+}
+
 async function doSearch(page = 1) {
   const raw = document.getElementById('search-input').value.trim();
   if (!raw) return;
   const bracketMatch = raw.match(/\(([^)]+)\)$/);
   const q = bracketMatch ? bracketMatch[1].trim() : toEnglishName(raw);
-  // pageSize 由翻页区下拉或初始值决定，无需再读 select
   _currentPage = page;
   _lastQuery = q;
   const el = document.getElementById('search-results');
   el.innerHTML = renderSkeleton(5);
-  try {
-    const data = await fetchJSON(`${API}/cards?q=name:"${encodeURIComponent(q)}"&pageSize=${_pageSize}&page=${page}&orderBy=set.releaseDate`);
-    _lastSearchData = data.data || [];
-    _totalCount = data.totalCount || 0;
-    // 默认按市场价降序排序
-    _lastSearchData.sort((a, b) => (getBestPrice(b).market||0) - (getBestPrice(a).market||0));
-    _sortCol = 4; _sortDir = -1;
-    el.innerHTML = renderSearchTable(_lastSearchData, _totalCount, q, page);
-  } catch(e) {
-    el.innerHTML = `<div class="error-banner">❌ 请求失败：${e.message}。请检查网络连接。</div>`;
-  }
+
+  // 并行请求美版 + 日版
+  const jaName = toJapaneseName(q);
+  const [usData, yytResults] = await Promise.all([
+    fetchJSON(`${API}/cards?q=name:"${encodeURIComponent(q)}"&pageSize=${_pageSize}&page=${page}&orderBy=set.releaseDate`).catch(() => ({data:[], totalCount:0})),
+    page === 1 ? fetchYYT(jaName) : Promise.resolve(_yytData),
+  ]);
+
+  if (page === 1) _yytData = yytResults;
+  _lastSearchData = usData.data || [];
+  _totalCount = usData.totalCount || 0;
+  _lastSearchData.sort((a, b) => (getBestPrice(b).market||0) - (getBestPrice(a).market||0));
+  _sortCol = 4; _sortDir = -1;
+  el.innerHTML = renderSearchTable(_lastSearchData, _totalCount, q, page, _yytData);
 }
 
 document.getElementById('search-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') doSearch();
 });
 
-function renderSearchTable(cards, total, q, page = 1) {
-  if (!cards.length) return `<div class="empty-state"><div class="icon">🃏</div><p>未找到「${q}」相关卡片</p></div>`;
+function renderJPSection(yytData) {
+  if (!yytData || !yytData.length) return '';
+  const cards = yytData.slice(0, 12);
+  const items = cards.map(c => {
+    const isSold = c.stock === '售罄';
+    return `<div class="jp-card">
+      <a href="${c.url}" target="_blank" rel="noopener">
+        <div class="jp-card-name">${c.name}</div>
+        ${c.number ? `<div class="jp-card-number">${c.number}</div>` : ''}
+        <div class="jp-card-price">¥${c.price_jpy.toLocaleString()}</div>
+        <div class="jp-card-stock ${isSold?'sold':''}">${c.stock}</div>
+      </a>
+    </div>`;
+  }).join('');
+  return `<div class="jp-section">
+    <h3><span class="jp-badge">🇯🇵 日版</span> 遊々亭价格</h3>
+    <p class="jp-sub">点击卡片跳转遊々亭购买 · 共 ${yytData.length} 条结果</p>
+    <div class="jp-grid">${items}</div>
+  </div>`;
+}
+
+function renderSearchTable(cards, total, q, page = 1, yytData = []) {
+  if (!cards.length && !yytData.length) return `<div class="empty-state"><div class="icon">🃏</div><p>未找到「${q}」相关卡片</p></div>`;
+  if (!cards.length) return renderJPSection(yytData);
   const totalPages = Math.ceil(total / _pageSize);
   return `
     <div class="results-header">
@@ -792,7 +908,8 @@ function renderSearchTable(cards, total, q, page = 1) {
       </tbody>
     </table>
     </div>
-    ${renderPagination(page, totalPages)}`;
+    ${renderPagination(page, totalPages)}
+    ${page === 1 ? renderJPSection(yytData) : ''}`;
 }
 
 function renderPagination(current, total) {
@@ -911,6 +1028,38 @@ async function loadDetail(cardId, from) {
     const data = await fetchJSON(`${API}/cards/${cardId}`);
     const card = data.data;
     document.getElementById('detail-content').innerHTML = renderDetail(card);
+
+    // 异步加载日版价格（不阻塞主内容）
+    const jaName = toJapaneseName(card.name);
+    fetchYYT(jaName).then(yytResults => {
+      const el = document.getElementById('detail-jp-price');
+      if (!el) return;
+      if (!yytResults.length) {
+        el.innerHTML = '<p style="color:var(--text2);font-size:13px;">暂无日版价格数据</p>';
+        return;
+      }
+      el.innerHTML = `
+        <div class="price-section" style="margin-top:0;">
+          <h3 style="display:flex;align-items:center;gap:8px;">
+            <span class="jp-badge">🇯🇵 日版</span> 遊々亭价格
+          </h3>
+          <div class="jp-grid" style="margin-top:12px;">
+            ${yytResults.slice(0,6).map(c => `
+              <div class="jp-card">
+                <a href="${c.url}" target="_blank" rel="noopener">
+                  <div class="jp-card-name">${c.name}</div>
+                  ${c.number ? `<div class="jp-card-number">${c.number}</div>` : ''}
+                  <div class="jp-card-price">¥${c.price_jpy.toLocaleString()}</div>
+                  <div class="jp-card-stock ${c.stock==='售罄'?'sold':''}">${c.stock}</div>
+                </a>
+              </div>`).join('')}
+          </div>
+          <a href="https://yuyu-tei.jp/sell/poc/s/search?search_word=${encodeURIComponent(jaName)}"
+             target="_blank" class="buy-link" style="margin-top:16px;">
+            在遊々亭查看全部 ${yytResults.length} 条结果 ↗
+          </a>
+        </div>`;
+    });
   } catch(e) {
     document.getElementById('detail-content').innerHTML = `<div class="error-banner">❌ 加载失败：${e.message}</div>`;
   }
@@ -1026,6 +1175,9 @@ function renderDetail(card) {
         </div>
         ${tcgHtml}
         ${cmHtml}
+        <div id="detail-jp-price" style="margin-top:20px;">
+          <div style="color:var(--text2);font-size:13px;">⏳ 正在加载日版价格…</div>
+        </div>
       </div>
     </div>`;
 }
