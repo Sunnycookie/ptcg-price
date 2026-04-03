@@ -88,7 +88,10 @@
   }
 
   /* ── Main Layout ── */
-  main { max-width: 1200px; margin: 0 auto; padding: 40px 32px 80px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 0 32px 80px; }
+
+  #panel-search { padding-top: 0; }
+  .search-results-body { padding-top: 28px; }
 
   /* ── Pagination ── */
   .pagination {
@@ -125,14 +128,25 @@
 
   /* ── Search Hero ── */
   .search-hero {
-    margin-bottom: 48px;
+    position: sticky;
+    top: 73px;   /* header 高度 */
+    z-index: 90;
+    background: var(--bg);
+    padding: 16px 0 12px;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .search-hero-title {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 10px;
   }
   .search-hero h1 {
-    font-size: clamp(32px, 5vw, 56px);
+    font-size: clamp(20px, 3vw, 28px);
     font-weight: 700;
-    letter-spacing: -2px;
-    line-height: 1.05;
-    margin-bottom: 8px;
+    letter-spacing: -1px;
+    line-height: 1.1;
   }
   .search-hero h1 em {
     font-style: normal;
@@ -140,8 +154,8 @@
   }
   .search-hero p {
     color: var(--text2);
-    font-size: 15px;
-    margin-bottom: 28px;
+    font-size: 13px;
+    margin: 0;
   }
 
   .search-bar {
@@ -159,9 +173,9 @@
   }
   .search-bar input {
     flex: 1;
-    padding: 14px 18px;
+    padding: 12px 18px;
     font-family: var(--sans);
-    font-size: 16px;
+    font-size: 15px;
     border: none;
     outline: none;
     background: transparent;
@@ -523,9 +537,12 @@
 
   /* ── Responsive ── */
   @media (max-width: 640px) {
-    header { padding: 16px; }
-    main { padding: 24px 16px 60px; }
-    .search-hero h1 { letter-spacing: -1px; }
+    header { padding: 12px 16px; }
+    main { padding: 0 16px 60px; }
+    .search-hero { top: 57px; padding: 12px 0 10px; }
+    .search-hero h1 { font-size: 18px; letter-spacing: -0.5px; }
+    .search-hero-title { flex-direction: column; gap: 2px; }
+    .search-results-body { padding-top: 20px; }
   }
 </style>
 </head>
@@ -547,8 +564,10 @@
   <!-- ── Search Panel ── -->
   <div id="panel-search" class="panel active">
     <div class="search-hero">
-      <h1>查询 <em>PTCG</em><br>卡片价格</h1>
-      <p>数据来源 pokemontcg.io · 包含 TCGPlayer & Cardmarket 价格 · 支持中文/日文/韩文名称搜索</p>
+      <div class="search-hero-title">
+        <h1>查询 <em>PTCG</em> 卡片价格</h1>
+        <p>pokemontcg.io · 支持中文/日文/韩文/图鉴号</p>
+      </div>
       <div class="search-bar">
         <input id="search-input" type="text" placeholder="支持中文/日文/英文/图鉴号，如 喷火龙 · リザードン · charizard · #006" autocomplete="off">
         <select class="lang-select" id="page-size-select">
@@ -559,17 +578,18 @@
         <button class="search-btn" onclick="doSearch()">Search</button>
       </div>
       <div class="quick-tags">
-        <span class="tag" onclick="quickSearch('charizard')">Charizard</span>
-        <span class="tag" onclick="quickSearch('pikachu')">Pikachu</span>
-        <span class="tag" onclick="quickSearch('mewtwo')">Mewtwo</span>
-        <span class="tag" onclick="quickSearch('umbreon')">Umbreon</span>
-        <span class="tag" onclick="quickSearch('rayquaza')">Rayquaza</span>
-        <span class="tag" onclick="quickSearch('lugia')">Lugia</span>
-        <span class="tag" onclick="quickSearch('eevee')">Eevee</span>
+        <span class="tag" onclick="quickSearch('charizard')">喷火龙</span>
+        <span class="tag" onclick="quickSearch('pikachu')">皮卡丘</span>
+        <span class="tag" onclick="quickSearch('mewtwo')">超梦</span>
+        <span class="tag" onclick="quickSearch('umbreon')">月亮伊布</span>
+        <span class="tag" onclick="quickSearch('rayquaza')">烈空坐</span>
+        <span class="tag" onclick="quickSearch('lugia')">路基欧</span>
+        <span class="tag" onclick="quickSearch('eevee')">伊布</span>
       </div>
     </div>
-
-    <div id="search-results"></div>
+    <div class="search-results-body">
+      <div id="search-results"></div>
+    </div>
   </div>
 
   <!-- ── Compare Panel ── -->
