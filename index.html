@@ -125,6 +125,19 @@
     color: var(--text2);
     padding: 0 8px;
   }
+  .page-size-inline {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    height: 36px;
+    padding: 0 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    background: var(--card-bg);
+    color: var(--text2);
+    cursor: pointer;
+    margin-right: 8px;
+  }
 
   /* ── Search Hero ── */
   .search-hero {
@@ -569,13 +582,8 @@
         <p>pokemontcg.io · 支持中文/日文/韩文/图鉴号</p>
       </div>
       <div class="search-bar">
-        <input id="search-input" type="text" placeholder="支持中文/日文/英文/图鉴号，如 喷火龙 · リザードン · charizard · #006" autocomplete="off">
-        <select class="lang-select" id="page-size-select">
-          <option value="20" selected>20条</option>
-          <option value="50">50条</option>
-          <option value="100">100条</option>
-        </select>
-        <button class="search-btn" onclick="doSearch()">Search</button>
+        <input id="search-input" type="text" placeholder="支持中文/日文/英文/图鉴号，如 喷火龙 · #006" autocomplete="off">
+        <button class="search-btn" onclick="doSearch()">搜索</button>
       </div>
       <div class="quick-tags">
         <span class="tag" onclick="quickSearch('charizard')">喷火龙</span>
@@ -737,7 +745,7 @@ async function doSearch(page = 1) {
   if (!raw) return;
   const bracketMatch = raw.match(/\(([^)]+)\)$/);
   const q = bracketMatch ? bracketMatch[1].trim() : toEnglishName(raw);
-  _pageSize = parseInt(document.getElementById('page-size-select').value);
+  // pageSize 由翻页区下拉或初始值决定，无需再读 select
   _currentPage = page;
   _lastQuery = q;
   const el = document.getElementById('search-results');
@@ -788,18 +796,20 @@ function renderSearchTable(cards, total, q, page = 1) {
 }
 
 function renderPagination(current, total) {
-  if (total <= 1) return '';
+  if (total < 1) return '';
   const pages = [];
-  // 始终显示首页
   pages.push(1);
-  // 当前页附近
   for (let i = Math.max(2, current - 2); i <= Math.min(total - 1, current + 2); i++) pages.push(i);
-  // 尾页
   if (total > 1) pages.push(total);
-  // 去重排序
   const uniq = [...new Set(pages)].sort((a, b) => a - b);
 
   let html = '<div class="pagination">';
+  // 每页条数选择器放在左侧
+  html += `<select class="page-size-inline" onchange="changePageSize(this.value)">
+    <option value="20" ${_pageSize==20?'selected':''}>20条/页</option>
+    <option value="50" ${_pageSize==50?'selected':''}>50条/页</option>
+    <option value="100" ${_pageSize==100?'selected':''}>100条/页</option>
+  </select>`;
   html += `<button class="page-btn" onclick="doSearch(${current-1})" ${current<=1?'disabled':''}>← 上页</button>`;
   let prev = 0;
   for (const p of uniq) {
@@ -811,6 +821,11 @@ function renderPagination(current, total) {
   html += `<span class="page-info">${current}/${total} 页</span>`;
   html += '</div>';
   return html;
+}
+
+function changePageSize(val) {
+  _pageSize = parseInt(val);
+  doSearch(1);
 }
 
 function getBestPrice(card) {
