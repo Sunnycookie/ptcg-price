@@ -90,6 +90,39 @@
   /* ── Main Layout ── */
   main { max-width: 1200px; margin: 0 auto; padding: 40px 32px 80px; }
 
+  /* ── Pagination ── */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 28px;
+    flex-wrap: wrap;
+  }
+  .page-btn {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    background: var(--card-bg);
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 150ms var(--ease);
+  }
+  .page-btn:hover { border-color: var(--text); color: var(--text); }
+  .page-btn.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .page-info {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+    padding: 0 8px;
+  }
+
   /* ── Search Hero ── */
   .search-hero {
     margin-bottom: 48px;
@@ -114,7 +147,7 @@
   .search-bar {
     display: flex;
     gap: 0;
-    max-width: 640px;
+    width: 100%;
     border: 2px solid var(--text);
     border-radius: 6px;
     overflow: hidden;
@@ -208,6 +241,7 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 14px;
+    margin: 0 auto;
   }
   thead tr { border-bottom: 2px solid var(--text); }
   thead th {
@@ -518,9 +552,9 @@
       <div class="search-bar">
         <input id="search-input" type="text" placeholder="支持中文/日文/英文/图鉴号，如 喷火龙 · リザードン · charizard · #006" autocomplete="off">
         <select class="lang-select" id="page-size-select">
-          <option value="10">10条</option>
-          <option value="20">20条</option>
+          <option value="20" selected>20条</option>
           <option value="50">50条</option>
+          <option value="100">100条</option>
         </select>
         <button class="search-btn" onclick="doSearch()">Search</button>
       </div>
@@ -565,8 +599,12 @@
 <script>
 const API = 'https://api.pokemontcg.io/v2';
 let _prevPanel = 'search';
-let _sortCol = null, _sortDir = 1;
+let _sortCol = 4, _sortDir = -1;   // 默认按市场价降序
 let _lastSearchData = [];
+let _lastQuery = '';
+let _currentPage = 1;
+let _totalCount = 0;
+let _pageSize = 20;
 let _nameMap = {};     // 中/日/韩 → 英文
 let _enNames = [];     // 英文名列表（用于自动补全）
 let _dexMap  = {};     // #006 / 6 → 英文名
@@ -674,19 +712,24 @@ function quickSearch(name) {
   doSearch();
 }
 
-async function doSearch() {
+async function doSearch(page = 1) {
   const raw = document.getElementById('search-input').value.trim();
   if (!raw) return;
-  // 括号内取英文名（自动补全格式 "喷火龙 (Charizard)"）
   const bracketMatch = raw.match(/\(([^)]+)\)$/);
   const q = bracketMatch ? bracketMatch[1].trim() : toEnglishName(raw);
-  const n = document.getElementById('page-size-select').value;
+  _pageSize = parseInt(document.getElementById('page-size-select').value);
+  _currentPage = page;
+  _lastQuery = q;
   const el = document.getElementById('search-results');
   el.innerHTML = renderSkeleton(5);
   try {
-    const data = await fetchJSON(`${API}/cards?q=name:"${encodeURIComponent(q)}"&pageSize=${n}&orderBy=set.releaseDate`);
+    const data = await fetchJSON(`${API}/cards?q=name:"${encodeURIComponent(q)}"&pageSize=${_pageSize}&page=${page}&orderBy=set.releaseDate`);
     _lastSearchData = data.data || [];
-    el.innerHTML = renderSearchTable(_lastSearchData, data.totalCount, q);
+    _totalCount = data.totalCount || 0;
+    // 默认按市场价降序排序
+    _lastSearchData.sort((a, b) => (getBestPrice(b).market||0) - (getBestPrice(a).market||0));
+    _sortCol = 4; _sortDir = -1;
+    el.innerHTML = renderSearchTable(_lastSearchData, _totalCount, q, page);
   } catch(e) {
     el.innerHTML = `<div class="error-banner">❌ 请求失败：${e.message}。请检查网络连接。</div>`;
   }
@@ -696,12 +739,13 @@ document.getElementById('search-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') doSearch();
 });
 
-function renderSearchTable(cards, total, q) {
+function renderSearchTable(cards, total, q, page = 1) {
   if (!cards.length) return `<div class="empty-state"><div class="icon">🃏</div><p>未找到「${q}」相关卡片</p></div>`;
+  const totalPages = Math.ceil(total / _pageSize);
   return `
     <div class="results-header">
       <h2>${q}</h2>
-      <span class="results-count">${total} 张</span>
+      <span class="results-count">共 ${total} 张 · 第 ${page}/${totalPages} 页</span>
     </div>
     <div class="table-wrap">
     <table id="search-table">
@@ -711,7 +755,7 @@ function renderSearchTable(cards, total, q) {
         <th onclick="sortTable(6)">图鉴号</th>
         <th onclick="sortTable(2)">系列</th>
         <th onclick="sortTable(3)">稀有度</th>
-        <th onclick="sortTable(4)">市场价 (USD)</th>
+        <th onclick="sortTable(4)" class="sort-desc">市场价 (USD)</th>
         <th onclick="sortTable(5)">低价 (USD)</th>
         <th></th>
       </tr></thead>
@@ -719,7 +763,34 @@ function renderSearchTable(cards, total, q) {
         ${cards.map(c => renderSearchRow(c)).join('')}
       </tbody>
     </table>
-    </div>`;
+    </div>
+    ${renderPagination(page, totalPages)}`;
+}
+
+function renderPagination(current, total) {
+  if (total <= 1) return '';
+  const pages = [];
+  // 始终显示首页
+  pages.push(1);
+  // 当前页附近
+  for (let i = Math.max(2, current - 2); i <= Math.min(total - 1, current + 2); i++) pages.push(i);
+  // 尾页
+  if (total > 1) pages.push(total);
+  // 去重排序
+  const uniq = [...new Set(pages)].sort((a, b) => a - b);
+
+  let html = '<div class="pagination">';
+  html += `<button class="page-btn" onclick="doSearch(${current-1})" ${current<=1?'disabled':''}>← 上页</button>`;
+  let prev = 0;
+  for (const p of uniq) {
+    if (p - prev > 1) html += `<span class="page-info">…</span>`;
+    html += `<button class="page-btn ${p===current?'active':''}" onclick="doSearch(${p})">${p}</button>`;
+    prev = p;
+  }
+  html += `<button class="page-btn" onclick="doSearch(${current+1})" ${current>=total?'disabled':''}>下页 →</button>`;
+  html += `<span class="page-info">${current}/${total} 页</span>`;
+  html += '</div>';
+  return html;
 }
 
 function getBestPrice(card) {
@@ -777,7 +848,7 @@ function renderSearchRow(card) {
 // ── Sort ──
 function sortTable(col) {
   if (_sortCol === col) _sortDir *= -1;
-  else { _sortCol = col; _sortDir = 1; }
+  else { _sortCol = col; _sortDir = -1; }  // 切换新列默认降序
   const ths = document.querySelectorAll('#search-table thead th');
   ths.forEach((th, i) => {
     th.classList.remove('sort-asc', 'sort-desc');
