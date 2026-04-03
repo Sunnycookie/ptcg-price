@@ -589,9 +589,14 @@ async function loadNameMap() {
 // ── 名称转换：中/日/韩/图鉴号 → 英文 ──
 function toEnglishName(input) {
   const trimmed = input.trim();
-  // 图鉴号格式：#006 / #25 / 纯数字
-  if (/^#?\d+$/.test(trimmed)) {
-    return _dexMap[trimmed] || _dexMap[trimmed.replace('#','')] || trimmed;
+  // 图鉴号格式：#006 / #25 / 纯数字（1~4位）
+  if (/^#?\d{1,4}$/.test(trimmed)) {
+    const num = trimmed.replace('#', '');
+    // 尝试带前导零和不带前导零两种格式
+    return _dexMap[`#${num}`]
+        || _dexMap[`#${num.padStart(3,'0')}`]
+        || _dexMap[num]
+        || trimmed;
   }
   // 已经是英文（全ASCII），直接用
   if (/^[\x00-\x7F]+$/.test(trimmed)) return trimmed;
