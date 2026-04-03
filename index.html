@@ -822,9 +822,38 @@ async function fetchYYT(jpName) {
   }
 }
 
+// 中文名 → 日文名映射
+const ZH_TO_JA = {
+  '喷火龙': 'リザードン', '小火龙': 'ヒトカゲ', '火恐龙': 'リザード',
+  '妙蛙种子': 'フシギダネ', '妙蛙草': 'フシギソウ', '妙蛙花': 'フシギバナ',
+  '杰尼龟': 'ゼニガメ', '卡咪龟': 'カメール', '水箭龟': 'カメックス',
+  '皮卡丘': 'ピカチュウ', '雷丘': 'ライチュ',
+  '超梦': 'ミュウツー', '梦幻': 'ミュウ',
+  '快龙': 'カイリュー', '袋龙': 'ミニリュウ', '哈克龙': 'ハクリュー',
+  '伊布': 'イーブイ', '水伊布': 'シャワーズ', '雷伊布': 'サンダース', '火伊布': 'ブースター',
+  '太阳伊布': 'エーフィ', '月亮伊布': 'ブラッキー', '叶伊布': 'リーフィア',
+  '冰伊布': 'グレイシア', '仙子伊布': 'ニンフィア',
+  '卡比兽': 'カビゴン', '快快球': 'ケンタロス',
+  '超级梦幻': 'ミュウツー', '闪电鸟': 'サンダー', '火焰鸟': 'ファイヤー', '急冻鸟': 'フリーザー',
+  '盖欧卡': 'カイオーガ', '固拉多': 'グラードン', '烈空坐': 'レックウザ',
+  '帝牙卢卡': 'ディアルガ', '帕路奇亚': 'パルキア', '骑拉帝纳': 'ギラティナ',
+  '黑拉斯': 'ゾロア', '黑拉斯卡': 'ゾロアーク',
+  '索罗亚': 'ゾロア', '索罗亚克': 'ゾロアーク',
+  '黑白库雷塞利亚': 'クレセリア',
+  '萝莉猫': 'ニャース', '猫老大': 'ペルシアン',
+  '马力欧': 'ルカリオ', '路卡利欧': 'ルカリオ', '波加曼': 'リオル',
+  '甲贺忍蛙': 'ゲッコウガ', '青蛙忍者': 'ゲッコウガ',
+  '决决大嘴鸟': 'ケッケ', '大比鸟': 'オニドリル',
+  '皮皮': 'ピッピ', '皮宝宝': 'ピクシー',
+  '可达鸭': 'コダック', '哥达鸭': 'ゴルダック',
+  '沙拉曼达': 'リザードン', '暴风龙': 'カイリュー',
+};
+
 // 英文名 → 日文名映射（用于遊々亭搜索）
 function toJapaneseName(enName) {
-  // 从 nameMap 反查
+  // 先查中文映射
+  if (ZH_TO_JA[enName]) return ZH_TO_JA[enName];
+  // 从 nameMap 反查英文→日文
   const lower = enName.toLowerCase();
   for (const [ja, en] of Object.entries(_nameMap)) {
     if (en.toLowerCase() === lower && /[\u3000-\u9fff]/.test(ja)) return ja;
@@ -843,7 +872,8 @@ async function doSearch(page = 1) {
   el.innerHTML = renderSkeleton(5);
 
   // 并行请求美版 + 日版
-  const jaName = toJapaneseName(q);
+  // 日版搜索：中文→查映射表，日文→直接用，英文→从nameMap反查
+  const jaName = toJapaneseName(/[\u4e00-\u9fa5]/.test(raw) ? raw : q);
   const [usData, yytResults] = await Promise.all([
     fetchJSON(`${API}/cards?q=name:"${encodeURIComponent(q)}"&pageSize=${_pageSize}&page=${page}&orderBy=set.releaseDate`).catch(() => ({data:[], totalCount:0})),
     page === 1 ? fetchYYT(jaName) : Promise.resolve(_yytData),
