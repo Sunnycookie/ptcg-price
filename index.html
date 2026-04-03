@@ -694,12 +694,10 @@
 
 <script>
 const API = 'https://api.pokemontcg.io/v2';
-// 同域名时用 /api/ 相对路径，局域网用本地端口，其他用完整域名
-const YYT_API = (location.hostname === 'ptcg.cookiez.xyz')
-  ? '/api'
-  : (location.hostname === 'localhost' || location.hostname.startsWith('10.') || location.hostname.startsWith('192.168.'))
-    ? `http://${location.hostname}:8766`
-    : 'https://ptcg.cookiez.xyz/api';
+// API 地址：统一用 HTTPS，避免 Mixed Content
+const YYT_API = (location.hostname === 'localhost' || location.hostname.startsWith('10.') || location.hostname.startsWith('192.168.'))
+  ? `http://${location.hostname}:8766`
+  : 'https://ptcg.cookiez.xyz/api';
 let _prevPanel = 'search';
 let _sortCol = 4, _sortDir = -1;   // 默认按市场价降序
 let _lastSearchData = [];
