@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PTCG Price — 宝可梦卡牌比价</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #faf9f6;
+    --bg2: #f2f0eb;
+    --bg3: #e8e4dc;
+    --text: #1a1714;
+    --text2: #5a5550;
+    --accent: #c0392b;       /* 锈红主色 */
+    --accent2: #e8d5b0;      /* 暖金辅色 */
+    --border: #d4cfc6;
+    --card-bg: #fff;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Space Grotesk', system-ui, sans-serif;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 2px solid var(--text);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo span { color: var(--accent); }
+  .logo-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--text);
+    color: var(--bg);
+    padding: 2px 8px;
+    border-radius: 2px;
+  }
+
+  nav {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+  }
+  .nav-btn {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 16px;
+    border: 1.5px solid transparent;
+    border-radius: 4px;
+    background: none;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 150ms var(--ease);
+  }
+  .nav-btn:hover { border-color: var(--border); color: var(--text); }
+  .nav-btn.active {
+    background: var(--text);
+    color: var(--bg);
+    border-color: var(--text);
+  }
+
+  /* ── Main Layout ── */
+  main { max-width: 1200px; margin: 0 auto; padding: 40px 32px 80px; }
+
+  /* ── Search Hero ── */
+  .search-hero {
+    margin-bottom: 48px;
+  }
+  .search-hero h1 {
+    font-size: clamp(32px, 5vw, 56px);
+    font-weight: 700;
+    letter-spacing: -2px;
+    line-height: 1.05;
+    margin-bottom: 8px;
+  }
+  .search-hero h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+  .search-hero p {
+    color: var(--text2);
+    font-size: 15px;
+    margin-bottom: 28px;
+  }
+
+  .search-bar {
+    display: flex;
+    gap: 0;
+    max-width: 640px;
+    border: 2px solid var(--text);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--card-bg);
+    transition: box-shadow 200ms var(--ease);
+  }
+  .search-bar:focus-within {
+    box-shadow: 4px 4px 0 var(--text);
+  }
+  .search-bar input {
+    flex: 1;
+    padding: 14px 18px;
+    font-family: var(--sans);
+    font-size: 16px;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+  }
+  .search-bar input::placeholder { color: var(--text2); opacity: 0.6; }
+
+  .lang-select {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 0 14px;
+    border: none;
+    border-left: 2px solid var(--border);
+    background: var(--bg2);
+    color: var(--text2);
+    cursor: pointer;
+    outline: none;
+  }
+
+  .search-btn {
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 600;
+    padding: 14px 24px;
+    border: none;
+    border-left: 2px solid var(--text);
+    background: var(--text);
+    color: var(--bg);
+    cursor: pointer;
+    transition: background 150ms;
+  }
+  .search-btn:hover { background: var(--accent); }
+
+  .quick-tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .tag {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 4px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 3px;
+    background: var(--card-bg);
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 150ms;
+  }
+  .tag:hover { border-color: var(--text); color: var(--text); background: var(--accent2); }
+
+  /* ── Tab Panels ── */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ── Results Table ── */
+  .results-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .results-header h2 { font-size: 20px; font-weight: 700; }
+  .results-count {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+    background: var(--bg2);
+    padding: 2px 10px;
+    border-radius: 2px;
+  }
+
+  .table-wrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  thead tr { border-bottom: 2px solid var(--text); }
+  thead th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text2);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  thead th:hover { color: var(--text); }
+  thead th.sort-asc::after { content: ' ↑'; color: var(--accent); }
+  thead th.sort-desc::after { content: ' ↓'; color: var(--accent); }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 100ms;
+  }
+  tbody tr:hover { background: var(--bg2); }
+  td { padding: 12px 14px; vertical-align: middle; }
+
+  .card-id {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+  }
+  .card-name { font-weight: 600; }
+  .card-set { color: var(--text2); font-size: 13px; }
+  .rarity-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    background: var(--bg2);
+    color: var(--text2);
+    white-space: nowrap;
+  }
+  .rarity-badge.rare { background: #fef3c7; color: #92400e; }
+  .rarity-badge.ultra { background: #ede9fe; color: #5b21b6; }
+  .rarity-badge.secret { background: #fce7f3; color: #9d174d; }
+  .rarity-badge.sir { background: #fce7f3; color: #9d174d; font-weight: 700; }
+
+  .price-cell { font-family: var(--mono); font-weight: 600; }
+  .price-cell.high { color: var(--accent); }
+  .price-cell.none { color: var(--border); }
+
+  .btn-detail {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 3px;
+    background: none;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 150ms;
+    white-space: nowrap;
+  }
+  .btn-detail:hover { border-color: var(--text); color: var(--text); background: var(--accent2); }
+
+  /* ── Detail Panel ── */
+  .detail-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    margin-bottom: 28px;
+    padding: 6px 0;
+    border: none;
+    background: none;
+    font-family: var(--sans);
+  }
+  .detail-back:hover { color: var(--text); }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+  @media (max-width: 700px) {
+    .detail-grid { grid-template-columns: 1fr; }
+  }
+
+  .card-img-wrap {
+    position: relative;
+  }
+  .card-img-wrap img {
+    width: 100%;
+    border-radius: 12px;
+    border: 2px solid var(--border);
+    display: block;
+    box-shadow: 6px 6px 0 var(--bg3);
+    transition: transform 300ms var(--ease), box-shadow 300ms var(--ease);
+  }
+  .card-img-wrap img:hover {
+    transform: translateY(-4px);
+    box-shadow: 8px 12px 0 var(--bg3);
+  }
+  .card-img-placeholder {
+    width: 100%;
+    aspect-ratio: 2.5/3.5;
+    border-radius: 12px;
+    border: 2px dashed var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--border);
+    font-size: 48px;
+  }
+
+  .detail-info {}
+  .detail-name {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 4px;
+  }
+  .detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 28px;
+  }
+  .meta-chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 2px;
+    border: 1.5px solid var(--border);
+    color: var(--text2);
+  }
+
+  .price-section { margin-bottom: 28px; }
+  .price-section h3 {
+    font-size: 11px;
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .price-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .price-item {
+    padding: 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    background: var(--card-bg);
+    transition: border-color 150ms, box-shadow 150ms;
+  }
+  .price-item:hover { border-color: var(--text); box-shadow: 3px 3px 0 var(--bg3); }
+  .price-type {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text2);
+    margin-bottom: 6px;
+  }
+  .price-value {
+    font-size: 22px;
+    font-weight: 700;
+    font-family: var(--mono);
+    color: var(--text);
+    letter-spacing: -1px;
+  }
+  .price-value.market { color: var(--accent); }
+  .price-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 4px;
+  }
+
+  .buy-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 20px;
+    background: var(--text);
+    color: var(--bg);
+    border-radius: 4px;
+    text-decoration: none;
+    transition: background 150ms;
+    margin-top: 4px;
+  }
+  .buy-link:hover { background: var(--accent); }
+
+  /* ── Compare Panel ── */
+  .compare-search {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 32px;
+    max-width: 480px;
+  }
+  .compare-search input {
+    flex: 1;
+    padding: 10px 16px;
+    font-family: var(--sans);
+    font-size: 15px;
+    border: 2px solid var(--text);
+    border-radius: 4px;
+    outline: none;
+    background: var(--card-bg);
+  }
+  .compare-search input:focus { box-shadow: 3px 3px 0 var(--bg3); }
+  .compare-search button {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 20px;
+    border: 2px solid var(--text);
+    border-radius: 4px;
+    background: var(--text);
+    color: var(--bg);
+    cursor: pointer;
+  }
+  .compare-search button:hover { background: var(--accent); border-color: var(--accent); }
+
+  /* ── Loading / Empty ── */
+  .skeleton-row td {
+    padding: 0 14px;
+  }
+  .skeleton {
+    height: 20px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--bg2) 25%, var(--bg3) 50%, var(--bg2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .empty-state {
+    padding: 64px 0;
+    text-align: center;
+    color: var(--text2);
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state p { font-size: 15px; }
+
+  .error-banner {
+    padding: 14px 18px;
+    border: 1.5px solid #fca5a5;
+    background: #fff1f1;
+    border-radius: 4px;
+    color: #991b1b;
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    header { padding: 16px; }
+    main { padding: 24px 16px 60px; }
+    .search-hero h1 { letter-spacing: -1px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span>PTCG</span> Price
+    <span class="logo-badge">pokemontcg.io</span>
+  </div>
+  <nav>
+    <button class="nav-btn active" onclick="switchTab('search')">🔍 搜索</button>
+    <button class="nav-btn" onclick="switchTab('compare')">📊 比价</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ── Search Panel ── -->
+  <div id="panel-search" class="panel active">
+    <div class="search-hero">
+      <h1>查询 <em>PTCG</em><br>卡片价格</h1>
+      <p>数据来源 pokemontcg.io · 包含 TCGPlayer & Cardmarket 价格 · 支持中文/日文/韩文名称搜索</p>
+      <div class="search-bar">
+        <input id="search-input" type="text" placeholder="输入宝可梦名称，支持中文/日文/英文，如 喷火龙 / リザードン / charizard" autocomplete="off">
+        <select class="lang-select" id="page-size-select">
+          <option value="10">10条</option>
+          <option value="20">20条</option>
+          <option value="50">50条</option>
+        </select>
+        <button class="search-btn" onclick="doSearch()">Search</button>
+      </div>
+      <div class="quick-tags">
+        <span class="tag" onclick="quickSearch('charizard')">Charizard</span>
+        <span class="tag" onclick="quickSearch('pikachu')">Pikachu</span>
+        <span class="tag" onclick="quickSearch('mewtwo')">Mewtwo</span>
+        <span class="tag" onclick="quickSearch('umbreon')">Umbreon</span>
+        <span class="tag" onclick="quickSearch('rayquaza')">Rayquaza</span>
+        <span class="tag" onclick="quickSearch('lugia')">Lugia</span>
+        <span class="tag" onclick="quickSearch('eevee')">Eevee</span>
+      </div>
+    </div>
+
+    <div id="search-results"></div>
+  </div>
+
+  <!-- ── Compare Panel ── -->
+  <div id="panel-compare" class="panel">
+    <div class="results-header">
+      <h2>跨版本比价</h2>
+    </div>
+    <p style="color:var(--text2);font-size:14px;margin-bottom:24px;">
+      输入宝可梦名称，对比该角色所有版本卡片的市场价格（按价格从高到低排列）
+    </p>
+    <div class="compare-search">
+      <input id="compare-input" type="text" placeholder="例如 charizard" autocomplete="off"
+             onkeydown="if(event.key==='Enter') doCompare()">
+      <button onclick="doCompare()">比价</button>
+    </div>
+    <div id="compare-results"></div>
+  </div>
+
+  <!-- ── Detail Panel ── -->
+  <div id="panel-detail" class="panel">
+    <button class="detail-back" onclick="closeDetail()">← 返回结果</button>
+    <div id="detail-content"></div>
+  </div>
+
+</main>
+
+<script>
+const API = 'https://api.pokemontcg.io/v2';
+let _prevPanel = 'search';
+let _sortCol = null, _sortDir = 1;
+let _lastSearchData = [];
+let _nameMap = {};     // 中/日/韩 → 英文
+let _enNames = [];     // 英文名列表（用于自动补全）
+
+// ── 加载名称对照表 ──
+async function loadNameMap() {
+  try {
+    const r = await fetch('names.json');
+    if (!r.ok) return;
+    const data = await r.json();
+    _nameMap = data.name_map || {};
+    _enNames = data.en_names || [];
+    setupAutocomplete();
+  } catch(e) {
+    console.warn('names.json 加载失败，仅支持英文搜索', e);
+  }
+}
+
+// ── 名称转换：中/日/韩 → 英文 ──
+function toEnglishName(input) {
+  const trimmed = input.trim();
+  // 已经是英文（全ASCII），直接用
+  if (/^[\x00-\x7F]+$/.test(trimmed)) return trimmed;
+  // 查对照表
+  return _nameMap[trimmed] || trimmed;
+}
+
+// ── 自动补全 ──
+function setupAutocomplete() {
+  const inputs = [
+    { el: document.getElementById('search-input'), listId: 'search-datalist' },
+    { el: document.getElementById('compare-input'), listId: 'compare-datalist' },
+  ];
+  inputs.forEach(({ el, listId }) => {
+    if (!el) return;
+    let dl = document.getElementById(listId);
+    if (!dl) { dl = document.createElement('datalist'); dl.id = listId; document.body.appendChild(dl); }
+    el.setAttribute('list', listId);
+    el.addEventListener('input', () => {
+      const val = el.value.trim();
+      if (!val || val.length < 1) { dl.innerHTML = ''; return; }
+      const isAscii = /^[\x00-\x7F]+$/.test(val);
+      let matches = [];
+      if (isAscii) {
+        // 英文模糊匹配
+        const lower = val.toLowerCase();
+        matches = _enNames.filter(n => n.toLowerCase().startsWith(lower)).slice(0, 8);
+      } else {
+        // 非英文：查对照表中以 val 开头的键，最多8个
+        matches = Object.entries(_nameMap)
+          .filter(([k]) => k.startsWith(val))
+          .map(([k, v]) => `${k} (${v})`)
+          .slice(0, 8);
+      }
+      dl.innerHTML = matches.map(m => `<option value="${m}">`).join('');
+    });
+  });
+}
+
+loadNameMap();
+
+// ── Tab switching ──
+function switchTab(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.querySelectorAll('.nav-btn')[name === 'search' ? 0 : 1].classList.add('active');
+}
+
+function showDetail(fromPanel) {
+  _prevPanel = fromPanel;
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-detail').classList.add('active');
+}
+
+function closeDetail() {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + _prevPanel).classList.add('active');
+  if (_prevPanel === 'search') document.querySelectorAll('.nav-btn')[0].classList.add('active');
+  else document.querySelectorAll('.nav-btn')[1].classList.add('active');
+}
+
+// ── API ──
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ── Search ──
+function quickSearch(name) {
+  document.getElementById('search-input').value = name;
+  doSearch();
+}
+
+async function doSearch() {
+  const raw = document.getElementById('search-input').value.trim();
+  if (!raw) return;
+  // 括号内取英文名（自动补全格式 "喷火龙 (Charizard)"）
+  const bracketMatch = raw.match(/\(([^)]+)\)$/);
+  const q = bracketMatch ? bracketMatch[1].trim() : toEnglishName(raw);
+  const n = document.getElementById('page-size-select').value;
+  const el = document.getElementById('search-results');
+  el.innerHTML = renderSkeleton(5);
+  try {
+    const data = await fetchJSON(`${API}/cards?q=name:"${encodeURIComponent(q)}"&pageSize=${n}&orderBy=set.releaseDate`);
+    _lastSearchData = data.data || [];
+    el.innerHTML = renderSearchTable(_lastSearchData, data.totalCount, q);
+  } catch(e) {
+    el.innerHTML = `<div class="error-banner">❌ 请求失败：${e.message}。请检查网络连接。</div>`;
+  }
+}
+
+document.getElementById('search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+function renderSearchTable(cards, total, q) {
+  if (!cards.length) return `<div class="empty-state"><div class="icon">🃏</div><p>未找到「${q}」相关卡片</p></div>`;
+  return `
+    <div class="results-header">
+      <h2>${q}</h2>
+      <span class="results-count">${total} 张</span>
+    </div>
+    <div class="table-wrap">
+    <table id="search-table">
+      <thead><tr>
+        <th onclick="sortTable(0)">卡片ID</th>
+        <th onclick="sortTable(1)">卡名</th>
+        <th onclick="sortTable(2)">系列</th>
+        <th onclick="sortTable(3)">稀有度</th>
+        <th onclick="sortTable(4)">市场价 (USD)</th>
+        <th onclick="sortTable(5)">低价 (USD)</th>
+        <th></th>
+      </tr></thead>
+      <tbody>
+        ${cards.map(c => renderSearchRow(c)).join('')}
+      </tbody>
+    </table>
+    </div>`;
+}
+
+function getBestPrice(card) {
+  const types = ['holofoil','normal','reverseHolofoil','1stEditionHolofoil','unlimitedHolofoil'];
+  let market = null, low = null;
+  const tcg = card.tcgplayer;
+  if (tcg && tcg.prices) {
+    for (const t of types) {
+      if (tcg.prices[t]) {
+        const p = tcg.prices[t];
+        if (p.market && (market === null || p.market > market)) market = p.market;
+        if (p.low && (low === null || p.low < low)) low = p.low;
+      }
+    }
+    // fallback: any key
+    if (market === null) {
+      for (const k of Object.keys(tcg.prices)) {
+        const p = tcg.prices[k];
+        if (p && p.market) market = p.market;
+        if (p && p.low) low = p.low;
+      }
+    }
+  }
+  return { market, low };
+}
+
+function rarityClass(r) {
+  if (!r) return '';
+  const rl = r.toLowerCase();
+  if (rl.includes('special illustration') || rl.includes('hyper')) return 'sir';
+  if (rl.includes('ultra') || rl.includes('secret') || rl.includes('rainbow')) return 'ultra';
+  if (rl.includes('rare')) return 'rare';
+  return '';
+}
+
+function renderSearchRow(card) {
+  const { market, low } = getBestPrice(card);
+  const mStr = market !== null ? `$${market.toFixed(2)}` : '—';
+  const lStr = low !== null ? `$${low.toFixed(2)}` : '—';
+  const mClass = market !== null ? (market >= 50 ? 'price-cell high' : 'price-cell') : 'price-cell none';
+  return `<tr>
+    <td><span class="card-id">${card.id}</span></td>
+    <td><span class="card-name">${card.name}</span></td>
+    <td><span class="card-set">${card.set?.name || '—'}</span></td>
+    <td><span class="rarity-badge ${rarityClass(card.rarity)}">${card.rarity || '—'}</span></td>
+    <td class="${mClass}">${mStr}</td>
+    <td class="price-cell">${lStr}</td>
+    <td><button class="btn-detail" onclick="loadDetail('${card.id}','search')">详情 →</button></td>
+  </tr>`;
+}
+
+// ── Sort ──
+function sortTable(col) {
+  if (_sortCol === col) _sortDir *= -1;
+  else { _sortCol = col; _sortDir = 1; }
+  const ths = document.querySelectorAll('#search-table thead th');
+  ths.forEach((th, i) => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (i === col) th.classList.add(_sortDir === 1 ? 'sort-asc' : 'sort-desc');
+  });
+  const sorted = [..._lastSearchData].sort((a, b) => {
+    let va, vb;
+    if (col === 0) { va = a.id; vb = b.id; }
+    else if (col === 1) { va = a.name; vb = b.name; }
+    else if (col === 2) { va = a.set?.name || ''; vb = b.set?.name || ''; }
+    else if (col === 3) { va = a.rarity || ''; vb = b.rarity || ''; }
+    else if (col === 4) { va = getBestPrice(a).market || -1; vb = getBestPrice(b).market || -1; return (va - vb) * _sortDir; }
+    else if (col === 5) { va = getBestPrice(a).low || -1; vb = getBestPrice(b).low || -1; return (va - vb) * _sortDir; }
+    return va < vb ? -_sortDir : va > vb ? _sortDir : 0;
+  });
+  document.querySelector('#search-table tbody').innerHTML = sorted.map(c => renderSearchRow(c)).join('');
+}
+
+// ── Detail ──
+async function loadDetail(cardId, from) {
+  showDetail(from);
+  document.getElementById('detail-content').innerHTML = `<div style="padding:40px 0;color:var(--text2);">加载中…</div>`;
+  try {
+    const data = await fetchJSON(`${API}/cards/${cardId}`);
+    const card = data.data;
+    document.getElementById('detail-content').innerHTML = renderDetail(card);
+  } catch(e) {
+    document.getElementById('detail-content').innerHTML = `<div class="error-banner">❌ 加载失败：${e.message}</div>`;
+  }
+}
+
+function renderDetail(card) {
+  const img = card.images?.large || card.images?.small;
+  const set = card.set || {};
+  const tcg = card.tcgplayer;
+  const cm = card.cardmarket;
+
+  // Build price items
+  const typeLabels = {
+    normal: '普通版',
+    holofoil: '闪卡 Holo',
+    reverseHolofoil: '逆闪 RH',
+    '1stEditionNormal': '初版普通',
+    '1stEditionHolofoil': '初版闪卡',
+    unlimitedHolofoil: '无限闪',
+  };
+
+  let tcgHtml = '';
+  if (tcg && tcg.prices) {
+    const items = [];
+    for (const [k, label] of Object.entries(typeLabels)) {
+      if (tcg.prices[k]) {
+        const p = tcg.prices[k];
+        items.push(`
+          <div class="price-item">
+            <div class="price-type">${label}</div>
+            <div class="price-value market">${p.market ? '$'+p.market.toFixed(2) : '—'}</div>
+            <div class="price-sub">低 ${p.low ? '$'+p.low.toFixed(2) : '—'} · 均 ${p.mid ? '$'+p.mid.toFixed(2) : '—'}</div>
+          </div>`);
+      }
+    }
+    // unknown types
+    for (const k of Object.keys(tcg.prices)) {
+      if (!typeLabels[k]) {
+        const p = tcg.prices[k];
+        if (p && typeof p === 'object') {
+          items.push(`
+            <div class="price-item">
+              <div class="price-type">${k}</div>
+              <div class="price-value market">${p.market ? '$'+p.market.toFixed(2) : '—'}</div>
+              <div class="price-sub">低 ${p.low ? '$'+p.low.toFixed(2) : '—'}</div>
+            </div>`);
+        }
+      }
+    }
+    if (items.length) {
+      tcgHtml = `
+        <div class="price-section">
+          <h3>TCGPlayer 美国市场 · 更新于 ${tcg.updatedAt || '?'}</h3>
+          <div class="price-grid">${items.join('')}</div>
+          <a href="${tcg.url}" target="_blank" class="buy-link" style="margin-top:16px;">
+            前往 TCGPlayer 购买 ↗
+          </a>
+        </div>`;
+    }
+  }
+
+  let cmHtml = '';
+  if (cm && cm.prices) {
+    const p = cm.prices;
+    const has = p.averageSellPrice || p.trendPrice || p.lowPrice;
+    if (has) {
+      cmHtml = `
+        <div class="price-section">
+          <h3>Cardmarket 欧洲参考 · 更新于 ${cm.updatedAt || '?'}</h3>
+          <div class="price-grid">
+            <div class="price-item">
+              <div class="price-type">低价</div>
+              <div class="price-value">€${(p.lowPrice||0).toFixed(2)}</div>
+            </div>
+            <div class="price-item">
+              <div class="price-type">均价</div>
+              <div class="price-value market">€${(p.averageSellPrice||0).toFixed(2)}</div>
+            </div>
+            <div class="price-item">
+              <div class="price-type">趋势价</div>
+              <div class="price-value">€${(p.trendPrice||0).toFixed(2)}</div>
+            </div>
+            ${p.reverseHoloTrend ? `<div class="price-item">
+              <div class="price-type">逆闪趋势</div>
+              <div class="price-value">€${p.reverseHoloTrend.toFixed(2)}</div>
+            </div>` : ''}
+          </div>
+        </div>`;
+    }
+  }
+
+  if (!tcgHtml && !cmHtml) {
+    tcgHtml = `<p style="color:var(--text2);font-size:14px;">该卡片暂无价格数据</p>`;
+  }
+
+  return `
+    <div class="detail-grid">
+      <div class="card-img-wrap">
+        ${img
+          ? `<img src="${img}" alt="${card.name}" loading="lazy">`
+          : `<div class="card-img-placeholder">🃏</div>`}
+      </div>
+      <div class="detail-info">
+        <div class="detail-name">${card.name}</div>
+        <div class="detail-meta">
+          <span class="meta-chip">${card.id}</span>
+          <span class="meta-chip">${set.series || ''} · ${set.name || ''}</span>
+          <span class="meta-chip">#${card.number || '?'}</span>
+          ${card.rarity ? `<span class="meta-chip rarity-badge ${rarityClass(card.rarity)}">${card.rarity}</span>` : ''}
+          ${card.artist ? `<span class="meta-chip">画师：${card.artist}</span>` : ''}
+          ${set.releaseDate ? `<span class="meta-chip">${set.releaseDate}</span>` : ''}
+        </div>
+        ${tcgHtml}
+        ${cmHtml}
+      </div>
+    </div>`;
+}
+
+// ── Compare ──
+async function doCompare() {
+  const raw = document.getElementById('compare-input').value.trim();
+  if (!raw) return;
+  const bracketMatch = raw.match(/\(([^)]+)\)$/);
+  const q = bracketMatch ? bracketMatch[1].trim() : toEnglishName(raw);
+  const el = document.getElementById('compare-results');
+  el.innerHTML = renderSkeleton(8);
+  try {
+    const data = await fetchJSON(`${API}/cards?q=name:"${encodeURIComponent(q)}"&pageSize=50&orderBy=-set.releaseDate`);
+    const cards = data.data || [];
+    el.innerHTML = renderCompareTable(cards, data.totalCount, q);
+  } catch(e) {
+    el.innerHTML = `<div class="error-banner">❌ 请求失败：${e.message}</div>`;
+  }
+}
+
+document.getElementById('compare-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doCompare();
+});
+
+function renderCompareTable(cards, total, q) {
+  if (!cards.length) return `<div class="empty-state"><div class="icon">🃏</div><p>未找到「${q}」</p></div>`;
+
+  const rows = cards.map(c => {
+    const { market, low } = getBestPrice(c);
+    return { card: c, market: market || 0, low: low || 0 };
+  }).sort((a, b) => b.market - a.market);
+
+  return `
+    <div class="results-header">
+      <h2>${q} 全版本比价</h2>
+      <span class="results-count">共 ${total} 张 · 显示 ${cards.length} 张</span>
+    </div>
+    <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>卡片ID</th><th>系列</th><th>稀有度</th>
+        <th>市场价 (USD)</th><th>低价 (USD)</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(({ card, market, low }) => `<tr>
+          <td><span class="card-id">${card.id}</span></td>
+          <td><span class="card-set">${card.set?.name || '—'}</span></td>
+          <td><span class="rarity-badge ${rarityClass(card.rarity)}">${card.rarity || '—'}</span></td>
+          <td class="${market >= 50 ? 'price-cell high' : market > 0 ? 'price-cell' : 'price-cell none'}">${market > 0 ? '$'+market.toFixed(2) : '—'}</td>
+          <td class="price-cell">${low > 0 ? '$'+low.toFixed(2) : '—'}</td>
+          <td><button class="btn-detail" onclick="loadDetail('${card.id}','compare')">详情 →</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>`;
+}
+
+// ── Skeleton ──
+function renderSkeleton(n) {
+  return `<div class="table-wrap"><table><tbody>
+    ${Array(n).fill(0).map(() => `<tr class="skeleton-row">
+      ${Array(6).fill(0).map(() => `<td style="padding:16px 14px"><div class="skeleton" style="width:${60+Math.random()*40}%"></div></td>`).join('')}
+    </tr>`).join('')}
+  </tbody></table></div>`;
+}
+</script>
+
+</body>
+</html>
