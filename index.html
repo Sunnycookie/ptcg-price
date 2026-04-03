@@ -871,20 +871,39 @@ async function doSearch(page = 1) {
   const el = document.getElementById('search-results');
   el.innerHTML = renderSkeleton(5);
 
-  // 并行请求美版 + 日版
   // 日版搜索：中文→查映射表，日文→直接用，英文→从nameMap反查
   const jaName = toJapaneseName(/[\u4e00-\u9fa5]/.test(raw) ? raw : q);
-  const [usData, yytResults] = await Promise.all([
-    fetchJSON(`${API}/cards?q=name:"${encodeURIComponent(q)}"&pageSize=${_pageSize}&page=${page}&orderBy=set.releaseDate`).catch(() => ({data:[], totalCount:0})),
-    page === 1 ? fetchYYT(jaName) : Promise.resolve(_yytData),
-  ]);
 
-  if (page === 1) _yytData = yytResults;
+  // 先请求美版，立刻渲染，不等日版
+  const usData = await fetchJSON(`${API}/cards?q=name:"${encodeURIComponent(q)}"&pageSize=${_pageSize}&page=${page}&orderBy=set.releaseDate`).catch(() => ({data:[], totalCount:0}));
+
   _lastSearchData = usData.data || [];
   _totalCount = usData.totalCount || 0;
   _lastSearchData.sort((a, b) => (getBestPrice(b).market||0) - (getBestPrice(a).market||0));
   _sortCol = 4; _sortDir = -1;
-  el.innerHTML = renderSearchTable(_lastSearchData, _totalCount, q, page, _yytData);
+
+  // 先渲染美版结果（日版区显示加载中）
+  if (page === 1) {
+    el.innerHTML = renderSearchTable(_lastSearchData, _totalCount, q, page, []) +
+      `<div id="yyt-loading" style="padding:16px;color:var(--text2);text-align:center;">⏳ 正在加载日版价格…</div>`;
+  } else {
+    el.innerHTML = renderSearchTable(_lastSearchData, _totalCount, q, page, _yytData);
+  }
+
+  // 异步加载日版，完成后插入
+  if (page === 1) {
+    fetchYYT(jaName).then(yytResults => {
+      _yytData = yytResults;
+      const loadingEl = document.getElementById('yyt-loading');
+      if (loadingEl) {
+        if (yytResults.length > 0) {
+          loadingEl.outerHTML = renderJPSection(yytResults);
+        } else {
+          loadingEl.remove();
+        }
+      }
+    });
+  }
 }
 
 document.getElementById('search-input').addEventListener('keydown', e => {
