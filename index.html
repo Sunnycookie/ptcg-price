@@ -694,7 +694,12 @@
 
 <script>
 const API = 'https://api.pokemontcg.io/v2';
-const YYT_API = 'https://ptcg.cookiez.xyz';
+// 同域名时用相对路径，其他域名（如 GitHub Pages）用完整地址
+const YYT_API = (location.hostname === 'ptcg.cookiez.xyz')
+  ? ''  // 相对路径，请求当前域名
+  : (location.hostname === 'localhost' || location.hostname.startsWith('10.') || location.hostname.startsWith('192.168.'))
+    ? `http://${location.hostname}:8766`
+    : 'https://ptcg.cookiez.xyz';
 let _prevPanel = 'search';
 let _sortCol = 4, _sortDir = -1;   // 默认按市场价降序
 let _lastSearchData = [];
