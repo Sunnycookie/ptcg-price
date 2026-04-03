@@ -1122,15 +1122,12 @@ async function loadDetail(cardId, from) {
     const card = data.data;
     document.getElementById('detail-content').innerHTML = renderDetail(card);
 
-    // 异步加载日版价格（精确匹配）
+    // 异步加载日版价格（按宝可梦名宽泛搜索，显示所有版本）
     const jaName = toJapaneseName(card.name);
-    // searchJa：宽泛搜索词（宝可梦名），exactJa：精确过滤（带后缀的完整卡名）
+    // 只做宽泛搜索：nameMap 里只有基础日文名，无法精确匹配特定卡版本
     const searchJa = jaName !== card.name ? jaName : toJapaneseName(_lastQuery || card.name);
-    // exact 只在能转换出日文名时启用（避免传入英文导致零结果）
-    const exactJa = jaName !== card.name ? jaName : '';
-    console.log('详情页日版 search:', searchJa, 'exact:', exactJa);
-    // 第一步：精确匹配
-    fetchYYT(searchJa, exactJa).then(async ({ results: exactResults, error }) => {
+    console.log('详情页日版 search:', searchJa);
+    fetchYYT(searchJa).then(async ({ results: yytResults, error }) => {
       const el = document.getElementById('detail-jp-price');
       if (!el) return;
       if (error) {
@@ -1138,23 +1135,14 @@ async function loadDetail(cardId, from) {
         return;
       }
 
-      // 精确匹配有结果
-      if (exactResults.length > 0) {
-        el.innerHTML = renderDetailJP(exactResults, searchJa, '精确匹配');
+      // 有结果 → 直接显示
+      if (yytResults.length > 0) {
+        el.innerHTML = renderDetailJP(yytResults, searchJa, '日版参考价');
         return;
       }
 
-      // 精确匹配为空 → 提示并显示相似推荐
-      if (exactJa) {
-        el.innerHTML = `<p style="color:var(--text2);font-size:13px;margin-bottom:8px;">🇯🇵 未找到精确匹配的日版卡牌，为您推荐相似卡牌：</p>`;
-        // 再拉宽泛结果（不带 exact）
-        const { results: similarResults } = await fetchYYT(searchJa);
-        if (similarResults.length > 0) {
-          el.innerHTML += renderDetailJP(similarResults, searchJa, '相似推荐');
-        } else {
-          el.innerHTML += '<p style="color:var(--text2);font-size:13px;">🇯🇵 未查找到日版价格</p>';
-        }
-      } else {
+      // 无结果
+      {
         el.innerHTML = '<p style="color:var(--text2);font-size:13px;">🇯🇵 未查找到日版价格</p>';
       }
     });
